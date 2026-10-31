@@ -1,3 +1,4 @@
+import Firma from '../components/Firma';
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
@@ -13,6 +14,7 @@ function LegalPage({ title, children }: { title: string; children: ReactNode }) 
           {children}
         </article>
         <p className="mt-6 text-center text-sm"><Link to="/" className="text-igm-600 underline">← Volver al inicio</Link></p>
+        <Firma className="mt-4" />
       </main>
     </div>
   );

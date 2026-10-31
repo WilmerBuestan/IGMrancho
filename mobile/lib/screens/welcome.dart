@@ -105,6 +105,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
               const SizedBox(height: 8),
               const Text('Instituto Geográfico Militar · Ministerio de Defensa Nacional',
                   textAlign: TextAlign.center, style: TextStyle(color: Brand.green500, fontSize: 11)),
+              const SizedBox(height: 6),
+              const Firma(dark: true),
             ],
           ),
         ),

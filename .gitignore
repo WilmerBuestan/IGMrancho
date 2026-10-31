@@ -7,3 +7,4 @@ secrets/
 mobile/android/app/google-services.json
 mobile/android/key.properties
 *.jks
+*.apk

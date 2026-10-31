@@ -51,7 +51,7 @@ class _AdminShellState extends State<AdminShell> {
       body: s,
       bottomNavigationBar: ValueListenableBuilder<int>(
         valueListenable: pendingCount,
-        builder: (_, n, _) => NavigationBar(
+        builder: (_, n, _) => NavWithFirma(nav: NavigationBar(
           selectedIndex: s.currentIndex,
           onDestinationSelected: (i) => s.goBranch(i, initialLocation: i == s.currentIndex),
           destinations: [
@@ -64,7 +64,7 @@ class _AdminShellState extends State<AdminShell> {
             const NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'Reportes'),
             const NavigationDestination(icon: Icon(Icons.tune_outlined), selectedIcon: Icon(Icons.tune), label: 'Ajustes'),
           ],
-        ),
+        )),
       ),
     );
   }

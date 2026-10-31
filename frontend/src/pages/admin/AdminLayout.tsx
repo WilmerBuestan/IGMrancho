@@ -1,3 +1,4 @@
+import Firma from '../../components/Firma';
 import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { adminToken, api } from '../../api';
@@ -65,6 +66,7 @@ export default function AdminLayout() {
       <button onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-igm-300 hover:bg-white/10 hover:text-white">
         <span>⏻</span> Cerrar sesión
       </button>
+      <Firma dark className="pt-2" />
     </div>
   );
 
@@ -112,6 +114,7 @@ export default function AdminLayout() {
       <main className="mx-auto max-w-6xl px-4 py-6 lg:px-8 lg:py-8">
         <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-igm-400 print:hidden">{current?.label}</p>
         <Outlet />
+        <Firma className="mt-10 lg:hidden print:block" />
       </main>
     </div>
   );

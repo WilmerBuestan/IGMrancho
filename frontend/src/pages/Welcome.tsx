@@ -1,3 +1,4 @@
+import Firma from '../components/Firma';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, longDate, PublicConfig } from '../api';
@@ -72,6 +73,7 @@ export default function Welcome() {
           <Link to="/privacidad" className="hover:text-white">Privacidad</Link>
           <Link to="/terminos" className="hover:text-white">Términos</Link>
         </div>
+        <Firma dark className="mt-3" />
       </footer>
     </div>
   );

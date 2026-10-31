@@ -17,7 +17,7 @@ class ClientShell extends StatelessWidget {
         title: const Row(children: [Logos(height: 36), SizedBox(width: 10), BrandTitle(subtitle: 'Reserva de alimentación')]),
       ),
       body: shell,
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: NavWithFirma(nav: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
         destinations: const [
@@ -25,7 +25,7 @@ class ClientShell extends StatelessWidget {
           NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Mis reservas'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Mi perfil'),
         ],
-      ),
+      )),
     );
   }
 }

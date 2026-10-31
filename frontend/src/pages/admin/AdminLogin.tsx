@@ -1,3 +1,4 @@
+import Firma from '../../components/Firma';
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { adminToken, api } from '../../api';
@@ -45,6 +46,7 @@ export default function AdminLogin() {
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button className="btn-primary w-full" disabled={loading}>{loading ? 'Entrando…' : 'Entrar'}</button>
         <Link to="/" className="block text-center text-sm text-igm-500 hover:text-igm-900">← Volver al inicio</Link>
+        <Firma />
       </form>
     </div>
   );

@@ -228,3 +228,37 @@ void toast(BuildContext context, String msg, {bool error = false}) {
       backgroundColor: error ? Brand.danger : null,
     ));
 }
+
+/// Firma del desarrollador: pequeña pero visible en todas las pantallas.
+class Firma extends StatelessWidget {
+  const Firma({super.key, this.dark = false});
+  final bool dark;
+  @override
+  Widget build(BuildContext context) => Text.rich(
+        TextSpan(children: [
+          const TextSpan(text: 'Desarrollado por '),
+          TextSpan(
+            text: 'Wilmer Buestán',
+            style: TextStyle(fontWeight: FontWeight.w800, color: dark ? Brand.gold : context.colors.primary),
+          ),
+        ]),
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 11, letterSpacing: 0.3, color: dark ? Brand.green300 : context.muted),
+      );
+}
+
+/// Barra inferior con la firma encima de la navegación.
+class NavWithFirma extends StatelessWidget {
+  const NavWithFirma({super.key, required this.nav});
+  final Widget nav;
+  @override
+  Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: double.infinity,
+          color: context.colors.surface,
+          padding: const EdgeInsets.only(top: 5, bottom: 1),
+          child: const Firma(),
+        ),
+        nav,
+      ]);
+}

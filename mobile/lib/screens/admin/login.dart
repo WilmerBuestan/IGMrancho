@@ -120,6 +120,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       ],
                       const SizedBox(height: 6),
                       TextButton(onPressed: () => context.go('/'), child: const Text('← Volver al inicio')),
+                      const Firma(),
                     ]),
                   ),
                 ),

@@ -541,6 +541,7 @@ class _SuccessScreenState extends State<SuccessScreen> {
                 child: const Text('Ver mis reservas'),
               ),
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hacer otra reserva', style: TextStyle(color: Colors.white))),
+              const Firma(dark: true),
             ]),
           ),
         ),

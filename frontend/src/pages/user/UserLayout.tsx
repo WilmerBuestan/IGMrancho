@@ -1,3 +1,4 @@
+import Firma from '../../components/Firma';
 import { NavLink, Outlet } from 'react-router-dom';
 import Header from '../../components/Header';
 
@@ -22,6 +23,7 @@ export default function UserLayout() {
       </Header>
       <main className="mx-auto max-w-6xl px-4 py-6 pb-28 sm:py-10">
         <Outlet />
+        <Firma className="mt-10" />
       </main>
       {/* Barra de pestañas inferior en celular */}
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-igm-100 bg-white/95 backdrop-blur sm:hidden"
