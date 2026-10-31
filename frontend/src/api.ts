@@ -31,6 +31,8 @@ export interface AdminSettings {
   closedDates: string[];
   driveEnabled: boolean;
   driveFolderUrl?: string | null;
+  reminderMinutes: number;
+  pushEnabled?: boolean;
 }
 
 export type Status = 'pendiente' | 'aprobada' | 'rechazada';

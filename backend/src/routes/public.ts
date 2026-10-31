@@ -6,6 +6,7 @@ import { config } from '../config';
 import { bookingWindow, today } from '../dates';
 import { pool } from '../db';
 import { syncDrive } from '../drive';
+import { notifyAdminsNewPayment } from '../push';
 import { getSettings } from '../settings';
 import { absPath, ALLOWED_MIME, receiptUrl, saveReceipt, verifyReceiptSig } from '../storage';
 import { isInstitutionalEmail, isValidCedula, parseQty } from '../validators';
@@ -98,6 +99,7 @@ publicRouter.post('/reservations', createLimiter, upload.single('comprobante'), 
   );
 
   syncDrive().catch((e) => console.error('[drive]', e));
+  notifyAdminsNewPayment({ fullName, totalCents: total, serviceDate });
   res.status(201).json({ code, serviceDate, totalCents: total, desayuno, almuerzo, merienda });
 });
 
@@ -128,4 +130,26 @@ publicRouter.get('/receipts/:id', async (req, res) => {
   res.setHeader('Content-Type', rows[0].receipt_mime);
   res.setHeader('Cache-Control', 'private, max-age=3600');
   res.sendFile(absPath(rows[0].receipt_path));
+});
+
+/** La app registra su token de notificaciones con los datos de la persona. */
+publicRouter.post('/devices', lookupLimiter, async (req, res) => {
+  const token = String(req.body?.token ?? '');
+  const cedula = String(req.body?.cedula ?? '').trim() || null;
+  const email = String(req.body?.email ?? '').trim().toLowerCase() || null;
+  const reminders = req.body?.reminders !== false;
+  if (token.length < 20 || token.length > 4096) return res.status(400).json({ error: 'Token inválido' });
+  // Un celular que antes era admin sigue siéndolo; solo se actualizan los datos de cliente.
+  await pool.query(
+    `INSERT INTO devices (token, role, cedula, email, reminders) VALUES ($1, 'client', $2, $3, $4)
+     ON CONFLICT (token) DO UPDATE SET cedula = EXCLUDED.cedula, email = EXCLUDED.email,
+       reminders = EXCLUDED.reminders, updated_at = now()`,
+    [token, cedula, email, reminders],
+  );
+  res.json({ ok: true });
+});
+
+publicRouter.delete('/devices/:token', async (req, res) => {
+  await pool.query(`DELETE FROM devices WHERE token = $1 AND role = 'client'`, [req.params.token]);
+  res.json({ ok: true });
 });

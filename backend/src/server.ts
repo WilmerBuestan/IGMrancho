@@ -4,11 +4,13 @@ import express, { NextFunction, Request, Response } from 'express';
 import { config, driveEnabled } from './config';
 import { migrate } from './db';
 import { startDriveLoop } from './drive';
+import { initPush, startReminderLoop } from './push';
 import { adminRouter } from './routes/admin';
 import { publicRouter } from './routes/public';
 
 async function main() {
   await migrate();
+  initPush();
 
   const app = express();
   app.set('trust proxy', 1);
@@ -29,6 +31,7 @@ async function main() {
     console.log(`IGM Rancho API en :${config.port} — Drive ${driveEnabled ? 'activado' : 'desactivado'}`);
   });
   startDriveLoop();
+  startReminderLoop();
 }
 
 main().catch((err) => {

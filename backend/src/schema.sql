@@ -30,3 +30,15 @@ CREATE TABLE IF NOT EXISTS reservations (
 CREATE INDEX IF NOT EXISTS reservations_date_idx   ON reservations (service_date);
 CREATE INDEX IF NOT EXISTS reservations_cedula_idx ON reservations (cedula);
 CREATE INDEX IF NOT EXISTS reservations_drive_idx  ON reservations (drive_status);
+
+-- Celulares con la app instalada (tokens de Firebase Cloud Messaging)
+CREATE TABLE IF NOT EXISTS devices (
+  token      TEXT PRIMARY KEY,
+  -- client | admin
+  role       TEXT NOT NULL,
+  cedula     TEXT,
+  email      TEXT,
+  reminders  BOOLEAN NOT NULL DEFAULT true,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS devices_person_idx ON devices (cedula, email);

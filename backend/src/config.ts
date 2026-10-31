@@ -16,6 +16,8 @@ export const config = {
   uploadsDir: process.env.UPLOADS_DIR ?? path.resolve('uploads'),
   timezone: process.env.TZ_APP ?? 'America/Guayaquil',
   emailDomain: (process.env.EMAIL_DOMAIN ?? 'geograficomilitar.gob.ec').toLowerCase(),
+  // Llave de cuenta de servicio de Firebase (proyecto igm-rancho-app) para enviar notificaciones.
+  firebaseCredentials: process.env.FIREBASE_CREDENTIALS ?? '/secrets/firebase-admin.json',
   drive: {
     clientId: process.env.GOOGLE_CLIENT_ID ?? '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',

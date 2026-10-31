@@ -26,6 +26,8 @@ services:
     volumes:
       # Copia local de cada captura: la app las muestra desde aquí aunque Drive falle.
       - uploads_data:/data/uploads
+      # Llave de Firebase para notificaciones (secrets/firebase-admin.json, fuera de git)
+      - ./secrets:/secrets:ro
     depends_on:
       postgres:
         condition: service_healthy

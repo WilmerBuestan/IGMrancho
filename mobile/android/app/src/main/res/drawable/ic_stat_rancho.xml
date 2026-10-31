@@ -1,0 +1,8 @@
+<!-- Ícono de notificación (silueta blanca): plato con vapor -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M3,11h18a9,9 0,0 1,-18 0z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M2,10h20v1.6H2z" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.6" android:strokeLineCap="round"
+        android:pathData="M8,7.5c0,-1.5 1.5,-1.5 1.5,-3M12,7.5c0,-1.5 1.5,-1.5 1.5,-3M16,7.5c0,-1.5 1.5,-1.5 1.5,-3" />
+</vector>

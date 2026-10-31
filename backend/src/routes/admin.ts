@@ -6,6 +6,7 @@ import { driveEnabled } from '../config';
 import { addDays, bookingWindow, isValidDate, today } from '../dates';
 import { pool } from '../db';
 import { syncDrive } from '../drive';
+import { notifyClientStatus, pushEnabled } from '../push';
 import { getSettings, setSetting } from '../settings';
 import { receiptUrl, saveQr } from '../storage';
 
@@ -67,12 +68,16 @@ adminRouter.get('/reservations', async (req, res) => {
 adminRouter.patch('/reservations/:id', async (req, res) => {
   const { status, adminNote } = req.body ?? {};
   if (!['pendiente', 'aprobada', 'rechazada'].includes(status)) return res.status(400).json({ error: 'Estado inválido' });
-  const { rowCount } = await pool.query('UPDATE reservations SET status = $2, admin_note = $3 WHERE id = $1', [
-    req.params.id,
-    status,
-    typeof adminNote === 'string' && adminNote.trim() ? adminNote.trim().slice(0, 300) : null,
-  ]);
-  if (!rowCount) return res.status(404).json({ error: 'Reserva no encontrada' });
+  const note = typeof adminNote === 'string' && adminNote.trim() ? adminNote.trim().slice(0, 300) : null;
+  const { rows } = await pool.query(
+    `UPDATE reservations r SET status = $2, admin_note = $3
+       FROM (SELECT id, status AS old FROM reservations WHERE id = $1) o
+      WHERE r.id = o.id
+      RETURNING r.cedula, r.email, r.code, o.old`,
+    [req.params.id, status, note],
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Reserva no encontrada' });
+  if (rows[0].old !== status) notifyClientStatus({ ...rows[0], status, note });
   res.json({ ok: true });
 });
 
@@ -197,7 +202,7 @@ adminRouter.get('/report', async (req, res) => {
 
 adminRouter.get('/settings', async (_req, res) => {
   const s = await getSettings();
-  res.json({ ...s, driveEnabled, driveFolderUrl: s.driveRootId ? `https://drive.google.com/drive/folders/${s.driveRootId}` : null });
+  res.json({ ...s, driveEnabled, pushEnabled: pushEnabled(), driveFolderUrl: s.driveRootId ? `https://drive.google.com/drive/folders/${s.driveRootId}` : null });
 });
 
 function cents(v: unknown): number {
@@ -233,6 +238,11 @@ adminRouter.put('/settings', async (req, res) => {
   }
   if (b.notice !== undefined) await setSetting('notice', String(b.notice).slice(0, 1000));
   if (b.open !== undefined) await setSetting('open', Boolean(b.open));
+  if (b.reminderMinutes !== undefined) {
+    const n = Number(b.reminderMinutes);
+    if (!Number.isInteger(n) || n < 0 || n > 600) return res.status(400).json({ error: 'Recordatorio inválido' });
+    await setSetting('reminderMinutes', n);
+  }
   if (b.closedDates !== undefined) {
     if (!Array.isArray(b.closedDates) || b.closedDates.length > 400 || !b.closedDates.every(isValidDate))
       return res.status(400).json({ error: 'Fechas sin servicio inválidas' });
@@ -254,5 +264,22 @@ adminRouter.post('/qr', qrUpload.single('qr'), async (req, res) => {
 adminRouter.post('/drive/retry', async (_req, res) => {
   await pool.query(`UPDATE reservations SET drive_attempts = 0 WHERE drive_status IN ('failed', 'disabled')`);
   await syncDrive();
+  res.json({ ok: true });
+});
+
+/** El celular del admin se registra para recibir avisos de pagos nuevos. */
+adminRouter.post('/devices', async (req, res) => {
+  const token = String(req.body?.token ?? '');
+  if (token.length < 20 || token.length > 4096) return res.status(400).json({ error: 'Token inválido' });
+  await pool.query(
+    `INSERT INTO devices (token, role) VALUES ($1, 'admin')
+     ON CONFLICT (token) DO UPDATE SET role = 'admin', updated_at = now()`,
+    [token],
+  );
+  res.json({ ok: true });
+});
+
+adminRouter.delete('/devices/:token', async (req, res) => {
+  await pool.query(`UPDATE devices SET role = 'client' WHERE token = $1`, [req.params.token]);
   res.json({ ok: true });
 });

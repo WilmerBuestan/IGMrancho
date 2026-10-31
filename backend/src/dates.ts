@@ -18,6 +18,10 @@ function nowParts(): { date: string; minutes: number } {
   };
 }
 
+export function nowMinutes(): number {
+  return nowParts().minutes;
+}
+
 export function today(): string {
   return nowParts().date;
 }

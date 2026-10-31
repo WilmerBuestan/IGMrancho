@@ -7,6 +7,7 @@ export default function ScheduleAdmin() {
   const { settings, save, saving, msg } = useSettings();
   const [open, setOpen] = useState(true);
   const [cutoff, setCutoff] = useState('20:00');
+  const [reminder, setReminder] = useState(60);
   const [closed, setClosed] = useState<string[]>([]);
   const [newDate, setNewDate] = useState('');
   const [preview, setPreview] = useState<PublicConfig | null>(null);
@@ -17,6 +18,7 @@ export default function ScheduleAdmin() {
     if (!settings) return;
     setOpen(settings.open);
     setCutoff(settings.cutoff);
+    setReminder(settings.reminderMinutes ?? 60);
     setClosed(settings.closedDates);
   }, [settings]);
 
@@ -60,6 +62,16 @@ export default function ScheduleAdmin() {
               Ej. con {cutoff}: para comer el martes hay que reservar hasta el lunes a las {cutoff}. Pasada esa hora, la reserva queda para el siguiente día con servicio.
             </p>
           </div>
+          <div>
+            <label className="label" htmlFor="reminder">Recordatorio en la app (minutos antes de la hora límite)</label>
+            <select id="reminder" className="input" value={reminder} onChange={(e) => setReminder(Number(e.target.value))}>
+              <option value={0}>Apagado</option>
+              {[15, 30, 45, 60, 90, 120, 180].map((m) => <option key={m} value={m}>{m} minutos antes</option>)}
+            </select>
+            <p className="mt-2 text-sm text-igm-500">
+              Notificación a quienes tienen la app y aún no reservaron.{settings.pushEnabled === false && ' ⚠️ El servidor aún no tiene la llave de Firebase.'}
+            </p>
+          </div>
         </section>
 
         <section className="card space-y-4 p-5">
@@ -99,7 +111,7 @@ export default function ScheduleAdmin() {
         </section>
       </div>
 
-      <SaveBar msg={msg} saving={saving} onSave={async () => { if (await save({ open, cutoff, closedDates: closed })) loadPreview(); }} />
+      <SaveBar msg={msg} saving={saving} onSave={async () => { if (await save({ open, cutoff, reminderMinutes: reminder, closedDates: closed })) loadPreview(); }} />
     </div>
   );
 }

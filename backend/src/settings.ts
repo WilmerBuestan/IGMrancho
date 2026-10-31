@@ -23,6 +23,8 @@ export interface Settings {
   open: boolean; // interruptor general de reservas
   closedDates: string[]; // días sin servicio (feriados, franco)
   driveRootId: string | null; // carpeta raíz creada en Drive (se guarda para poder moverla/renombrarla)
+  reminderMinutes: number; // minutos antes de la hora límite para el recordatorio push (0 = apagado)
+  lastReminderFor: string | null; // fecha de servicio del último recordatorio enviado
 }
 
 const DEFAULTS: Settings = {
@@ -34,6 +36,8 @@ const DEFAULTS: Settings = {
   open: true,
   closedDates: [],
   driveRootId: null,
+  reminderMinutes: 60,
+  lastReminderFor: null,
 };
 
 export async function getSettings(): Promise<Settings> {
