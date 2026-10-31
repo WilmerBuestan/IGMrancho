@@ -66,7 +66,7 @@ export function notifyClientStatus(r: { cedula: string; email: string; status: s
   safe(
     (async () => {
       const { rows } = await pool.query<{ token: string }>(
-        `SELECT token FROM devices WHERE role = 'client' AND cedula = $1 AND email = $2`,
+        `SELECT token FROM devices WHERE cedula = $1 AND email = $2`,
         [r.cedula, r.email],
       );
       const ok = r.status === 'aprobada';
@@ -96,7 +96,7 @@ async function reminderTick(): Promise<void> {
   await setSetting('lastReminderFor', serviceDate);
   const { rows } = await pool.query<{ token: string }>(
     `SELECT d.token FROM devices d
-      WHERE d.role = 'client' AND d.reminders
+      WHERE d.cedula IS NOT NULL AND d.reminders
         AND NOT EXISTS (SELECT 1 FROM reservations r
                          WHERE r.cedula = d.cedula AND r.service_date = $1 AND r.status <> 'rechazada')`,
     [serviceDate],
