@@ -43,16 +43,29 @@ Ya están en `frontend/public/`:
 
 Para cambiarlos, reemplaza los archivos y ejecuta `docker compose up -d --build frontend`.
 
-## Despliegue en el servidor Ubuntu
+## Despliegue en el servidor (wilo-server)
+
+Vive en `~/igm-rancho` (clon de https://github.com/WilmerBuestan/IGMrancho), separado de Alfredo y TeConecta.
+Publicado en **https://rancho.simtrg.date** mediante su **propio túnel** de Cloudflare (`igm-rancho`).
 
 ```bash
-cp .env.example .env
-# Edita .env: contraseñas, ADMIN_USER/ADMIN_PASSWORD, JWT_SECRET (openssl rand -hex 32)
+# Primera vez
+git clone https://github.com/WilmerBuestan/IGMrancho.git ~/igm-rancho && cd ~/igm-rancho
+cp .env.example .env   # llenar claves y descomentar COMPOSE_FILE / COMPOSE_PROFILES
 docker compose up -d --build
+
+# Actualizar con lo último de GitHub (datos y .env no se tocan)
+ssh 192.168.100.134 '~/igm-rancho/actualizar.sh'
 ```
 
-La app queda en `http://IP_DEL_SERVIDOR:8085` (cambia `APP_PORT` en `.env`).
-Para HTTPS, ponla detrás del proxy/túnel que ya tengas en el servidor.
+En el servidor, `.env` define `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`: la app escucha solo en
+`127.0.0.1:8085` y `cloudflared` (perfil `tunel`) la publica.
+
+### Crear el túnel (una vez)
+1. Cloudflare → **Zero Trust → Networks → Tunnels → Create a tunnel** → *Cloudflared* → nombre `igm-rancho`.
+2. Copia el token (el texto largo después de `--token`) en `CLOUDFLARE_TUNNEL_TOKEN` del `.env` y pon `COMPOSE_PROFILES=tunel`.
+3. *Public hostname*: subdominio `rancho`, dominio `simtrg.date`, servicio **HTTP** → `frontend:80`.
+4. `docker compose up -d`.
 
 ## Conectar Google Drive (una sola vez)
 
