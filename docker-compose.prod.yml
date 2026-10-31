@@ -1,0 +1,19 @@
+# Producción en wilo-server (se combina con docker-compose.yml vía COMPOSE_FILE en .env):
+# - La app solo escucha dentro del servidor (127.0.0.1); desde internet se entra por el túnel propio.
+# - cloudflared usa un túnel exclusivo de IGM Rancho (no comparte nada con Alfredo ni TeConecta).
+#   Se activa con COMPOSE_PROFILES=tunel cuando CLOUDFLARE_TUNNEL_TOKEN está en .env.
+
+services:
+  frontend:
+    ports: !override
+      - "127.0.0.1:${APP_PORT:-8085}:80"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - frontend
+    profiles: ["tunel"]
