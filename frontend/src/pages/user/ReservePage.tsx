@@ -1,3 +1,4 @@
+import { AppDownloadBanner } from '../../components/AppDownload';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, isValidCedula, longDate, Meal, MEALS, mealsText, money, PublicConfig } from '../../api';
@@ -85,6 +86,7 @@ export default function ReservePage() {
     <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-8">
       {/* 1. Ranchos */}
       <section className="space-y-5 lg:col-start-1">
+        <AppDownloadBanner />
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Reserva tu rancho</h1>
           <p className="mt-2 text-igm-600">

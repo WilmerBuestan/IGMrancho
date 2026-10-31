@@ -1,3 +1,4 @@
+import { AppDownloadCard } from '../components/AppDownload';
 import Firma from '../components/Firma';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -61,6 +62,8 @@ export default function Welcome() {
             </span>
           </Link>
         </div>
+
+        <AppDownloadCard />
 
         <Link to="/mis-reservas" className="mt-6 text-sm text-igm-300 underline-offset-4 hover:text-white hover:underline">
           ¿Ya reservaste? Consulta el estado de tus reservas

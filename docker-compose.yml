@@ -35,6 +35,9 @@ services:
   frontend:
     build: ./frontend
     restart: unless-stopped
+    volumes:
+      # APK de la app y app.json (versión); se publican con mobile/publicar_apk.sh
+      - ./descargas:/usr/share/nginx/html/descargas:ro
     ports:
       - "${APP_PORT:-8085}:80"
     depends_on:
