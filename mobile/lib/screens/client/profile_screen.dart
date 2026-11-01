@@ -7,9 +7,24 @@ import '../../core/profile.dart';
 import '../../core/push.dart';
 import '../../core/theme.dart';
 import '../../widgets/common.dart';
+import '../../core/api.dart';
+import '../../core/models.dart';
+import '../../widgets/contact.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  Contact? contact;
+
+  @override
+  void initState() {
+    super.initState();
+    api.config().then((c) => mounted ? setState(() => contact = c.contact) : null).catchError((_) {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +58,8 @@ class ProfileScreen extends StatelessWidget {
               ]),
             ),
           ),
+          const SizedBox(height: 14),
+          ContactCard(contact: contact, title: '¿Necesitas ayuda?'),
           const SizedBox(height: 14),
           Card(
             child: Column(children: [

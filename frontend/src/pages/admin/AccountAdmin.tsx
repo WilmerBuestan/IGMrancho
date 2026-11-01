@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Account, api } from '../../api';
+import { Account, api, Contact } from '../../api';
 import PageTitle, { SaveBar } from '../../components/PageTitle';
 import { useSettings } from '../../hooks/useSettings';
 
@@ -12,7 +12,8 @@ export default function AccountAdmin() {
   const [account, setAccount] = useState<Account | null>(null);
   const [qrVersion, setQrVersion] = useState(Date.now());
 
-  useEffect(() => { if (settings) setAccount(settings.account); }, [settings]);
+  const [contact, setContact] = useState<Contact>({ name: '', phone: '' });
+  useEffect(() => { if (settings) { setAccount(settings.account); setContact(settings.contact); } }, [settings]);
   if (!settings || !account) return <p className="text-igm-500">{msg || 'Cargando…'}</p>;
 
   async function uploadQr(file: File) {
@@ -59,6 +60,23 @@ export default function AccountAdmin() {
             <input type="file" accept="image/*" className="sr-only" onChange={(e) => e.target.files?.[0] && uploadQr(e.target.files[0])} />
           </label>
         </section>
+        <section className="card space-y-4 p-5 lg:col-span-2">
+          <div>
+            <h2 className="text-lg font-bold">Contacto para problemas</h2>
+            <p className="text-sm text-igm-500">Aparece en la bienvenida, en Reservar y en Mis reservas con botones de WhatsApp y llamada.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="c-name">Nombre</label>
+              <input id="c-name" className="input" value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} />
+            </div>
+            <div>
+              <label className="label" htmlFor="c-phone">Celular</label>
+              <input id="c-phone" className="input" inputMode="tel" placeholder="0996038610" value={contact.phone}
+                     onChange={(e) => setContact({ ...contact, phone: e.target.value })} />
+            </div>
+          </div>
+        </section>
         <section className="card space-y-3 p-5 lg:col-span-2">
           <h2 className="text-lg font-bold">Google Drive</h2>
           <p className="text-sm text-igm-600">
@@ -74,7 +92,7 @@ export default function AccountAdmin() {
           )}
         </section>
       </div>
-      <SaveBar msg={msg} saving={saving} onSave={() => save({ account })} />
+      <SaveBar msg={msg} saving={saving} onSave={() => save({ account, contact })} />
     </div>
   );
 }

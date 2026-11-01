@@ -17,6 +17,7 @@ import '../../core/push.dart';
 import '../../core/share_inbox.dart';
 import '../../core/theme.dart';
 import '../../widgets/common.dart';
+import '../../widgets/contact.dart';
 
 class ReserveScreen extends StatefulWidget {
   const ReserveScreen({super.key});
@@ -133,7 +134,7 @@ class _ReserveScreenState extends State<ReserveScreen> {
       HapticFeedback.heavyImpact();
       if (!mounted) return;
       await Navigator.of(context).push(PageRouteBuilder(
-        pageBuilder: (_, _, _) => SuccessScreen(result: r),
+        pageBuilder: (_, _, _) => SuccessScreen(result: r, contact: cfg?.contact),
         transitionsBuilder: (_, a, _, c) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: 0.95, end: 1.0).animate(a), child: c)),
       ));
       if (mounted) setState(() => (qty = emptyQty(), file = null));
@@ -213,6 +214,8 @@ class _ReserveScreenState extends State<ReserveScreen> {
             ),
             const SizedBox(height: 16),
             _PayCard(cfg: c, total: total, count: count),
+            const SizedBox(height: 16),
+            ContactCard(contact: c.contact),
             const SizedBox(height: 16),
             Card(
               key: dataKey,
@@ -470,8 +473,9 @@ class _ReceiptPicker extends StatelessWidget {
 }
 
 class SuccessScreen extends StatefulWidget {
-  const SuccessScreen({super.key, required this.result});
+  const SuccessScreen({super.key, required this.result, this.contact});
   final Map<String, dynamic> result;
+  final Contact? contact;
   @override
   State<SuccessScreen> createState() => _SuccessScreenState();
 }
@@ -531,6 +535,8 @@ class _SuccessScreenState extends State<SuccessScreen> {
                   Text(money(r['totalCents']), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Brand.ink)),
                 ]),
               ).animate().fadeIn(delay: 450.ms).slideY(begin: 0.2, curve: Curves.easeOutCubic),
+              const SizedBox(height: 14),
+              ContactCard(contact: widget.contact, dark: true, title: '¿Te equivocaste en algo?').animate().fadeIn(delay: 700.ms),
               const Spacer(),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: Brand.gold, foregroundColor: Brand.ink, minimumSize: const Size.fromHeight(56)),

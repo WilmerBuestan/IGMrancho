@@ -25,6 +25,8 @@ class _AccountScreenState extends SettingsPageState<AccountScreen> {
     'numero': ('Número de cuenta', TextEditingController()),
   };
   int qrVersion = DateTime.now().millisecondsSinceEpoch;
+  final contactName = TextEditingController();
+  final contactPhone = TextEditingController();
 
   @override
   void apply(AdminSettings s) {
@@ -32,6 +34,8 @@ class _AccountScreenState extends SettingsPageState<AccountScreen> {
     for (final e in fields.entries) {
       e.value.$2.text = j[e.key] ?? '';
     }
+    contactName.text = s.contact.name;
+    contactPhone.text = s.contact.phone;
   }
 
   Future<void> _uploadQr() async {
@@ -66,6 +70,20 @@ class _AccountScreenState extends SettingsPageState<AccountScreen> {
                     decoration: InputDecoration(labelText: e.value.$1),
                   ),
                 ),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Contacto para problemas', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+              Text('Aparece en la bienvenida, Reservar y Mis reservas con WhatsApp y llamada.', style: TextStyle(color: context.muted, fontSize: 13)),
+              const SizedBox(height: 12),
+              TextField(controller: contactName, decoration: const InputDecoration(labelText: 'Nombre')),
+              const SizedBox(height: 12),
+              TextField(controller: contactPhone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Celular', hintText: '0996038610')),
             ]),
           ),
         ),
@@ -127,7 +145,10 @@ class _AccountScreenState extends SettingsPageState<AccountScreen> {
           ),
         ),
       ],
-      onSave: () => save({'account': {for (final e in fields.entries) e.key: e.value.$2.text.trim()}}),
+      onSave: () => save({
+        'account': {for (final e in fields.entries) e.key: e.value.$2.text.trim()},
+        'contact': {'name': contactName.text.trim(), 'phone': contactPhone.text.trim()},
+      }),
     );
   }
 }

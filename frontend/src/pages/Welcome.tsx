@@ -1,3 +1,4 @@
+import Contacto from '../components/Contacto';
 import { AppDownloadCard } from '../components/AppDownload';
 import Firma from '../components/Firma';
 import { useEffect, useState } from 'react';
@@ -64,6 +65,7 @@ export default function Welcome() {
         </div>
 
         <AppDownloadCard />
+        {cfg && <Contacto contact={cfg.contact} dark className="mt-4 w-full max-w-3xl" />}
 
         <Link to="/mis-reservas" className="mt-6 text-sm text-igm-300 underline-offset-4 hover:text-white hover:underline">
           ¿Ya reservaste? Consulta el estado de tus reservas

@@ -79,6 +79,16 @@ export function notifyClientStatus(r: { cedula: string; email: string; status: s
   );
 }
 
+export function notifyClientChange(r: { cedula: string; email: string | null }, title: string, body: string): void {
+  if (!r.email) return;
+  safe(
+    (async () => {
+      const { rows } = await pool.query<{ token: string }>(`SELECT token FROM devices WHERE cedula = $1 AND email = $2`, [r.cedula, r.email]);
+      await send(rows.map((x) => x.token), { title, body, route: '/mis-reservas' });
+    })(),
+  );
+}
+
 /** Recordatorio antes de la hora límite, solo a quien aún no reservó para el siguiente servicio. */
 async function reminderTick(): Promise<void> {
   if (!app) return;

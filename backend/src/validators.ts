@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { config } from './config';
 
 /** Valida una cédula ecuatoriana (10 dígitos, provincia y dígito verificador). */
@@ -25,4 +26,11 @@ export function parseQty(v: unknown): number {
   const n = Number(v ?? 0);
   if (!Number.isInteger(n) || n < 0 || n > 20) throw new Error('Cantidad inválida');
   return n;
+}
+
+export function newCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (const b of crypto.randomBytes(6)) out += alphabet[b % alphabet.length];
+  return `IGM-${out}`;
 }

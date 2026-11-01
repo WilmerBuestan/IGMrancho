@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+import fs from 'fs/promises';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
@@ -5,10 +7,11 @@ import { checkCredentials, issueToken, requireAdmin } from '../auth';
 import { driveEnabled } from '../config';
 import { addDays, bookingWindow, isValidDate, today } from '../dates';
 import { pool } from '../db';
-import { syncDrive } from '../drive';
-import { notifyClientStatus, pushEnabled } from '../push';
+import { syncDrive, trashDriveFile } from '../drive';
+import { notifyClientChange, notifyClientStatus, pushEnabled } from '../push';
 import { getSettings, setSetting } from '../settings';
-import { receiptUrl, saveQr } from '../storage';
+import { absPath, ALLOWED_MIME, receiptUrl, saveQr, saveReceipt } from '../storage';
+import { isValidCedula, newCode, parseQty } from '../validators';
 
 export const adminRouter = Router();
 
@@ -32,8 +35,13 @@ const LIST_SQL = `
   SELECT id, code, to_char(service_date, 'YYYY-MM-DD') AS "serviceDate", full_name AS "fullName", cedula, email,
          desayuno, almuerzo, merienda, total_cents AS "totalCents", status, admin_note AS "adminNote",
          receipt_mime AS "receiptMime", drive_status AS "driveStatus", drive_link AS "driveLink",
-         created_at AS "createdAt"
+         created_at AS "createdAt", created_by AS "createdBy", updated_at AS "updatedAt"
     FROM reservations`;
+
+const withUrl = <T extends { id: string; receiptMime: string | null }>(r: T) => ({
+  ...r,
+  receiptUrl: r.receiptMime ? receiptUrl(r.id) : null,
+});
 
 adminRouter.get('/reservations', async (req, res) => {
   const date = dateParam(req.query.date);
@@ -61,7 +69,7 @@ adminRouter.get('/reservations', async (req, res) => {
     date,
     driveEnabled,
     summary: { activas: sum(), aprobadas: sum('aprobada'), pendientes: sum('pendiente'), rechazadas: sum('rechazada') },
-    reservations: rows.map((r) => ({ ...r, receiptUrl: receiptUrl(r.id) })),
+    reservations: rows.map(withUrl),
   });
 });
 
@@ -77,7 +85,10 @@ adminRouter.patch('/reservations/:id', async (req, res) => {
     [req.params.id, status, note],
   );
   if (!rows[0]) return res.status(404).json({ error: 'Reserva no encontrada' });
-  if (rows[0].old !== status) notifyClientStatus({ ...rows[0], status, note });
+  if (rows[0].old !== status) {
+    notifyClientStatus({ ...rows[0], status, note });
+    await logHistory(req.params.id, rows[0].code, 'estado', { de: rows[0].old, a: status, nota: note });
+  }
   res.json({ ok: true });
 });
 
@@ -237,6 +248,11 @@ adminRouter.put('/settings', async (req, res) => {
     });
   }
   if (b.notice !== undefined) await setSetting('notice', String(b.notice).slice(0, 1000));
+  if (b.contact) {
+    const phone = String(b.contact.phone ?? '').replace(/[^\d+]/g, '');
+    if (phone && !/^(\+?593|0)\d{8,9}$/.test(phone)) return res.status(400).json({ error: 'Teléfono inválido (ej. 0996038610)' });
+    await setSetting('contact', { name: String(b.contact.name ?? '').trim().slice(0, 80), phone });
+  }
   if (b.open !== undefined) await setSetting('open', Boolean(b.open));
   if (b.reminderMinutes !== undefined) {
     const n = Number(b.reminderMinutes);
@@ -282,4 +298,210 @@ adminRouter.post('/devices', async (req, res) => {
 adminRouter.delete('/devices/:token', async (req, res) => {
   await pool.query(`UPDATE devices SET role = 'client' WHERE token = $1`, [req.params.token]);
   res.json({ ok: true });
+});
+
+// ---------- CRUD de reservas (el admin corrige lo que la gente hizo mal) ----------
+
+async function logHistory(id: string, code: string, action: string, detail: Record<string, unknown>): Promise<void> {
+  await pool.query(
+    'INSERT INTO reservation_history (reservation_id, code, action, detail) VALUES ($1, $2, $3, $4)',
+    [id, code, action, JSON.stringify(detail)],
+  );
+}
+
+const receiptUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => cb(null, ALLOWED_MIME.includes(file.mimetype)),
+});
+
+const STATUSES = ['pendiente', 'aprobada', 'rechazada'];
+
+interface Input {
+  fullName?: string;
+  cedula?: string;
+  email?: string | null;
+  serviceDate?: string;
+  desayuno?: number;
+  almuerzo?: number;
+  merienda?: number;
+  totalCents?: number;
+  status?: string;
+  adminNote?: string | null;
+}
+
+/** Valida los campos que vienen del formulario del admin. Con partial=true todos son opcionales. */
+function parseInput(b: Record<string, unknown>, partial: boolean): Input | string {
+  const out: Input = {};
+  const has = (k: string) => b[k] !== undefined && b[k] !== '';
+  if (has('fullName') || !partial) {
+    const v = String(b.fullName ?? '').trim().replace(/\s+/g, ' ');
+    if (v.length < 3 || v.length > 120) return 'Ingresa el nombre completo';
+    out.fullName = v;
+  }
+  if (has('cedula') || !partial) {
+    const v = String(b.cedula ?? '').trim();
+    if (!isValidCedula(v)) return 'La cédula no es válida';
+    out.cedula = v;
+  }
+  if (b.email !== undefined) {
+    // El admin puede registrar a alguien sin correo institucional (pago en efectivo, visitas...)
+    const v = String(b.email ?? '').trim().toLowerCase();
+    if (v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Correo inválido';
+    out.email = v || null;
+  }
+  if (has('serviceDate') || !partial) {
+    if (!isValidDate(b.serviceDate)) return 'Fecha inválida';
+    out.serviceDate = b.serviceDate as string;
+  }
+  try {
+    for (const k of ['desayuno', 'almuerzo', 'merienda'] as const) if (has(k) || !partial) out[k] = parseQty(b[k]);
+  } catch {
+    return 'Cantidades inválidas (máximo 20 por tipo)';
+  }
+  if (has('totalCents')) {
+    const n = Math.round(Number(b.totalCents));
+    if (!Number.isFinite(n) || n < 0 || n > 1_000_000) return 'Total inválido';
+    out.totalCents = n;
+  }
+  if (has('status')) {
+    if (!STATUSES.includes(String(b.status))) return 'Estado inválido';
+    out.status = String(b.status);
+  }
+  if (b.adminNote !== undefined) out.adminNote = String(b.adminNote ?? '').trim().slice(0, 300) || null;
+  return out;
+}
+
+async function priceOf(q: { desayuno: number; almuerzo: number; merienda: number }): Promise<number> {
+  const { prices } = await getSettings();
+  return q.desayuno * prices.desayuno + q.almuerzo * prices.almuerzo + q.merienda * prices.merienda;
+}
+
+/** Crear una reserva a mano (pago en efectivo, alguien que le escribió a Erick...). */
+adminRouter.post('/reservations', receiptUpload.single('comprobante'), async (req, res) => {
+  const input = parseInput(req.body ?? {}, false);
+  if (typeof input === 'string') return res.status(400).json({ error: input });
+  const q = { desayuno: input.desayuno!, almuerzo: input.almuerzo!, merienda: input.merienda! };
+  if (q.desayuno + q.almuerzo + q.merienda === 0) return res.status(400).json({ error: 'Elige al menos un rancho' });
+
+  const id = crypto.randomUUID();
+  let saved: { relPath: string; mime: string } | null = null;
+  if (req.file) {
+    try {
+      saved = await saveReceipt(id, input.serviceDate!, req.file.buffer, req.file.mimetype);
+    } catch {
+      return res.status(400).json({ error: 'No se pudo leer la imagen del comprobante' });
+    }
+  }
+  const total = input.totalCents ?? (await priceOf(q));
+  const code = newCode();
+  await pool.query(
+    `INSERT INTO reservations (id, code, service_date, full_name, cedula, email, desayuno, almuerzo, merienda,
+                               total_cents, receipt_path, receipt_mime, status, admin_note, created_by, drive_status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'admin',$15)`,
+    [id, code, input.serviceDate, input.fullName, input.cedula, input.email ?? '', q.desayuno, q.almuerzo, q.merienda,
+     total, saved?.relPath ?? null, saved?.mime ?? null, input.status ?? 'aprobada', input.adminNote ?? null,
+     saved ? 'pending' : 'disabled'],
+  );
+  await logHistory(id, code, 'creada', { por: 'admin', ...q, total, estado: input.status ?? 'aprobada' });
+  if (saved) syncDrive().catch((e) => console.error('[drive]', e));
+  const { rows } = await pool.query(`${LIST_SQL} WHERE id = $1`, [id]);
+  res.status(201).json(withUrl(rows[0]));
+});
+
+const FIELD_LABELS: Record<string, string> = {
+  full_name: 'nombre', cedula: 'cédula', email: 'correo', service_date: 'fecha', desayuno: 'desayunos',
+  almuerzo: 'almuerzos', merienda: 'meriendas', total_cents: 'total', status: 'estado', admin_note: 'nota',
+};
+
+/** Editar cualquier dato de una reserva y, si se envía, reemplazar el comprobante. */
+adminRouter.put('/reservations/:id', receiptUpload.single('comprobante'), async (req, res) => {
+  const input = parseInput(req.body ?? {}, true);
+  if (typeof input === 'string') return res.status(400).json({ error: input });
+  const { rows: cur } = await pool.query(
+    `SELECT *, to_char(service_date, 'YYYY-MM-DD') AS sd FROM reservations WHERE id = $1`,
+    [req.params.id],
+  );
+  const old = cur[0];
+  if (!old) return res.status(404).json({ error: 'Reserva no encontrada' });
+
+  const next = {
+    full_name: input.fullName ?? old.full_name,
+    cedula: input.cedula ?? old.cedula,
+    email: input.email === undefined ? old.email : input.email ?? '',
+    service_date: input.serviceDate ?? old.sd,
+    desayuno: input.desayuno ?? old.desayuno,
+    almuerzo: input.almuerzo ?? old.almuerzo,
+    merienda: input.merienda ?? old.merienda,
+    status: input.status ?? old.status,
+    admin_note: input.adminNote === undefined ? old.admin_note : input.adminNote,
+    total_cents: old.total_cents as number,
+  };
+  if (next.desayuno + next.almuerzo + next.merienda === 0) return res.status(400).json({ error: 'Debe quedar al menos un rancho' });
+  const qtyChanged = next.desayuno !== old.desayuno || next.almuerzo !== old.almuerzo || next.merienda !== old.merienda;
+  // Si cambian las cantidades y no mandan total, se recalcula con los precios actuales.
+  next.total_cents = input.totalCents ?? (qtyChanged ? await priceOf(next) : old.total_cents);
+
+  const changes: Record<string, { de: unknown; a: unknown }> = {};
+  for (const k of Object.keys(next) as (keyof typeof next)[]) {
+    const before = k === 'service_date' ? old.sd : old[k];
+    if (String(before ?? '') !== String(next[k] ?? '')) changes[FIELD_LABELS[k]] = { de: before, a: next[k] };
+  }
+
+  let receipt: { relPath: string; mime: string } | null = null;
+  if (req.file) {
+    try {
+      receipt = await saveReceipt(old.id, next.service_date, req.file.buffer, req.file.mimetype);
+    } catch {
+      return res.status(400).json({ error: 'No se pudo leer la imagen del comprobante' });
+    }
+    changes.comprobante = { de: old.receipt_path ? 'anterior' : 'sin comprobante', a: 'nuevo' };
+  }
+  if (Object.keys(changes).length === 0) return res.status(400).json({ error: 'No hay cambios que guardar' });
+
+  await pool.query(
+    `UPDATE reservations SET full_name=$2, cedula=$3, email=$4, service_date=$5, desayuno=$6, almuerzo=$7, merienda=$8,
+            total_cents=$9, status=$10, admin_note=$11, updated_at=now()
+            ${receipt ? ", receipt_path=$12, receipt_mime=$13, drive_status='pending', drive_attempts=0, drive_file_id=NULL, drive_link=NULL" : ''}
+      WHERE id=$1`,
+    [old.id, next.full_name, next.cedula, next.email, next.service_date, next.desayuno, next.almuerzo, next.merienda,
+     next.total_cents, next.status, next.admin_note, ...(receipt ? [receipt.relPath, receipt.mime] : [])],
+  );
+  if (receipt) {
+    if (old.receipt_path && old.receipt_path !== receipt.relPath) await fs.unlink(absPath(old.receipt_path)).catch(() => {});
+    trashDriveFile(old.drive_file_id);
+    syncDrive().catch((e) => console.error('[drive]', e));
+  }
+  await logHistory(old.id, old.code, 'editada', changes);
+
+  if (changes.estado) notifyClientStatus({ cedula: next.cedula, email: next.email, status: next.status, code: old.code, note: next.admin_note });
+  else notifyClientChange({ cedula: next.cedula, email: next.email }, '✏️ Tu reserva fue actualizada', `La administración corrigió tu reserva ${old.code}. Revísala en la app.`);
+
+  const { rows } = await pool.query(`${LIST_SQL} WHERE id = $1`, [old.id]);
+  res.json(withUrl(rows[0]));
+});
+
+/** Eliminar una reserva. Queda registrada en el historial y el comprobante va a la papelera de Drive. */
+adminRouter.delete('/reservations/:id', async (req, res) => {
+  const reason = String(req.body?.reason ?? req.query.reason ?? '').trim().slice(0, 300);
+  const { rows } = await pool.query('DELETE FROM reservations WHERE id = $1 RETURNING *, to_char(service_date, \'YYYY-MM-DD\') AS sd', [req.params.id]);
+  const r = rows[0];
+  if (!r) return res.status(404).json({ error: 'Reserva no encontrada' });
+  if (r.receipt_path) await fs.unlink(absPath(r.receipt_path)).catch(() => {});
+  trashDriveFile(r.drive_file_id);
+  await logHistory(r.id, r.code, 'eliminada', {
+    nombre: r.full_name, cedula: r.cedula, fecha: r.sd, desayunos: r.desayuno, almuerzos: r.almuerzo,
+    meriendas: r.merienda, total: r.total_cents, estado: r.status, motivo: reason || null,
+  });
+  notifyClientChange({ cedula: r.cedula, email: r.email }, '🗑️ Tu reserva fue anulada',
+    reason ? `Reserva ${r.code}: ${reason}` : `La administración anuló tu reserva ${r.code}.`);
+  res.json({ ok: true });
+});
+
+adminRouter.get('/reservations/:id/history', async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT action, detail, at FROM reservation_history WHERE reservation_id = $1 ORDER BY at DESC LIMIT 50',
+    [req.params.id],
+  );
+  res.json(rows);
 });

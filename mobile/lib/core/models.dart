@@ -4,6 +4,24 @@ int _i(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?
 
 Qty _qty(Map<String, dynamic> j) => {for (final m in Meal.values) m: _i(j[m.name])};
 
+class Contact {
+  Contact({required this.name, required this.phone});
+  factory Contact.fromJson(Map<String, dynamic>? j) => Contact(name: j?['name'] ?? '', phone: j?['phone'] ?? '');
+  String name, phone;
+  Map<String, dynamic> toJson() => {'name': name, 'phone': phone};
+
+  /// 0996038610 → 593996038610 (WhatsApp)
+  String get waNumber {
+    final d = phone.replaceAll(RegExp(r'\D'), '');
+    return d.startsWith('593') ? d : (d.startsWith('0') ? '593${d.substring(1)}' : d);
+  }
+
+  String get pretty {
+    final d = phone.replaceAll(RegExp(r'\D'), '');
+    return d.length == 10 ? '${d.substring(0, 3)} ${d.substring(3, 6)} ${d.substring(6)}' : phone;
+  }
+}
+
 class Account {
   Account({required this.titular, required this.banco, required this.tipo, required this.numero, required this.cedula});
   factory Account.fromJson(Map<String, dynamic> j) => Account(
@@ -28,7 +46,9 @@ class PublicConfig {
         serviceDate = j['serviceDate'],
         deadline = j['deadline'],
         emailDomain = j['emailDomain'],
-        closedDates = List<String>.from(j['closedDates'] ?? const []);
+        closedDates = List<String>.from(j['closedDates'] ?? const []),
+        contact = Contact.fromJson(j['contact']);
+  final Contact contact;
   final Qty prices;
   final String cutoff;
   final Account account;
@@ -67,14 +87,19 @@ class Reservation {
         receiptUrl = j['receiptUrl'],
         driveStatus = j['driveStatus'],
         driveLink = j['driveLink'],
+        createdBy = j['createdBy'] ?? 'cliente',
+        updatedAt = j['updatedAt'] == null ? null : DateTime.parse(j['updatedAt']).toLocal(),
         createdAt = DateTime.parse(j['createdAt']).toLocal();
-  final String id, code, serviceDate, fullName, receiptMime, receiptUrl;
+  final String id, code, serviceDate, fullName, createdBy;
+  final String? receiptMime, receiptUrl;
+  final DateTime? updatedAt;
   final String? cedula, email, adminNote, driveStatus, driveLink;
   final Qty qty;
   final int totalCents;
   Status status;
   final DateTime createdAt;
   bool get isPdf => receiptMime == 'application/pdf';
+  bool get hasReceipt => receiptUrl != null;
 }
 
 class Totals {
@@ -182,7 +207,9 @@ class AdminSettings {
         reminderMinutes = _i(j['reminderMinutes'] ?? 60),
         driveEnabled = j['driveEnabled'] == true,
         pushEnabled = j['pushEnabled'] == true,
-        driveFolderUrl = j['driveFolderUrl'];
+        driveFolderUrl = j['driveFolderUrl'],
+        contact = Contact.fromJson(j['contact']);
+  final Contact contact;
   final Qty prices;
   final String cutoff, notice;
   final Account account;
@@ -190,4 +217,14 @@ class AdminSettings {
   final bool open, driveEnabled, pushEnabled;
   final List<String> closedDates;
   final int reminderMinutes;
+}
+
+class HistoryItem {
+  HistoryItem.fromJson(Map<String, dynamic> j)
+      : action = j['action'],
+        detail = Map<String, dynamic>.from(j['detail'] ?? {}),
+        at = DateTime.parse(j['at']).toLocal();
+  final String action;
+  final Map<String, dynamic> detail;
+  final DateTime at;
 }

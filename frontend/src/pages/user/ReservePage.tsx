@@ -1,7 +1,8 @@
+import Contacto from '../../components/Contacto';
 import { AppDownloadBanner } from '../../components/AppDownload';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, isValidCedula, longDate, Meal, MEALS, mealsText, money, PublicConfig } from '../../api';
+import { api, Contact, isValidCedula, longDate, Meal, MEALS, mealsText, money, PublicConfig } from '../../api';
 import Stepper from '../../components/Stepper';
 
 const PROFILE_KEY = 'igm-rancho-perfil';
@@ -41,7 +42,7 @@ export default function ReservePage() {
 
   if (loadError) return <div className="card p-8 text-center text-red-700">{loadError}</div>;
   if (!cfg) return <div className="card animate-pulse p-8 text-center text-igm-400">Cargando…</div>;
-  if (created) return <Success created={created} onAgain={() => { setCreated(null); setQty({ desayuno: 0, almuerzo: 0, merienda: 0 }); setFile(null); }} onLookup={onLookup} />;
+  if (created) return <Success contact={cfg.contact} created={created} onAgain={() => { setCreated(null); setQty({ desayuno: 0, almuerzo: 0, merienda: 0 }); setFile(null); }} onLookup={onLookup} />;
 
   const emailOk = email.trim().toLowerCase().endsWith(`@${cfg.emailDomain}`);
 
@@ -134,6 +135,7 @@ export default function ReservePage() {
               <div className="mt-4 grid aspect-square w-full place-items-center rounded-2xl bg-igm-50 text-sm text-igm-400">QR pendiente</div>
             )}
             <AccountInfo cfg={cfg} />
+            <Contacto contact={cfg.contact} className="mt-5 !shadow-none !ring-igm-100" />
           </div>
         </div>
       </aside>
@@ -235,7 +237,7 @@ function AccountInfo({ cfg }: { cfg: PublicConfig }) {
   );
 }
 
-function Success({ created, onAgain, onLookup }: { created: Created; onAgain: () => void; onLookup: () => void }) {
+function Success({ created, onAgain, onLookup, contact }: { created: Created; onAgain: () => void; onLookup: () => void; contact: Contact }) {
   return (
     <div className="card mx-auto max-w-lg overflow-hidden text-center">
       <div className="bg-igm-900 px-6 py-8 text-white">
@@ -257,6 +259,7 @@ function Success({ created, onAgain, onLookup }: { created: Created; onAgain: ()
           <button className="btn-ghost" onClick={onLookup}>Ver mis reservas</button>
           <button className="btn-primary" onClick={onAgain}>Hacer otra reserva</button>
         </div>
+        <Contacto contact={contact} title="¿Te equivocaste en algo?" className="!shadow-none !ring-igm-100" />
       </div>
     </div>
   );

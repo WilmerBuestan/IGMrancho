@@ -137,6 +137,33 @@ class Api {
 
   Future<void> retryDrive() => _call(() => _dio.post('/admin/drive/retry'), (_) {});
 
+  /// Crear (id == null) o editar una reserva desde el panel. [file] reemplaza el comprobante.
+  Future<Reservation> saveReservation({
+    String? id,
+    required Map<String, dynamic> fields,
+    File? file,
+    String? mime,
+  }) {
+    final form = FormData.fromMap({
+      for (final e in fields.entries) e.key: '${e.value ?? ''}',
+      if (file != null)
+        'comprobante': MultipartFile.fromFileSync(file.path,
+            filename: file.uri.pathSegments.last, contentType: DioMediaType.parse(mime ?? 'image/jpeg')),
+    });
+    return _call(
+      () => id == null ? _dio.post('/admin/reservations', data: form) : _dio.put('/admin/reservations/$id', data: form),
+      (d) => Reservation.fromJson(d),
+    );
+  }
+
+  Future<void> deleteReservation(String id, String reason) =>
+      _call(() => _dio.delete('/admin/reservations/$id', data: {'reason': reason}), (_) {});
+
+  Future<List<HistoryItem>> history(String id) => _call(
+        () => _dio.get('/admin/reservations/$id/history'),
+        (d) => (d as List).map((e) => HistoryItem.fromJson(e)).toList(),
+      );
+
   Future<void> registerAdminDevice(String token) => _call(() => _dio.post('/admin/devices', data: {'token': token}), (_) {});
 
   Future<void> unregisterAdminDevice(String token) => _call(() => _dio.delete('/admin/devices/$token'), (_) {});

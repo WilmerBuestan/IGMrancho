@@ -9,7 +9,7 @@ import { syncDrive } from '../drive';
 import { notifyAdminsNewPayment } from '../push';
 import { getSettings } from '../settings';
 import { absPath, ALLOWED_MIME, receiptUrl, saveReceipt, verifyReceiptSig } from '../storage';
-import { isInstitutionalEmail, isValidCedula, parseQty } from '../validators';
+import { isInstitutionalEmail, isValidCedula, newCode, parseQty } from '../validators';
 
 export const publicRouter = Router();
 
@@ -36,6 +36,7 @@ publicRouter.get('/config', async (_req, res) => {
     serviceDate: w.serviceDate,
     deadline: w.deadline,
     emailDomain: config.emailDomain,
+    contact: s.contact,
   });
 });
 
@@ -45,13 +46,6 @@ publicRouter.get('/qr', async (_req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.sendFile(absPath(s.qrFile));
 });
-
-function newCode(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out = '';
-  for (const b of crypto.randomBytes(6)) out += alphabet[b % alphabet.length];
-  return `IGM-${out}`;
-}
 
 publicRouter.post('/reservations', createLimiter, upload.single('comprobante'), async (req, res) => {
   const s = await getSettings();
@@ -118,7 +112,7 @@ publicRouter.get('/reservations/lookup', lookupLimiter, async (req, res) => {
       LIMIT 60`,
     [cedula, email],
   );
-  res.json(rows.map((r) => ({ ...r, receiptUrl: receiptUrl(r.id) })));
+  res.json(rows.map((r) => ({ ...r, receiptUrl: r.receiptMime ? receiptUrl(r.id) : null })));
 });
 
 publicRouter.get('/receipts/:id', async (req, res) => {
@@ -126,7 +120,7 @@ publicRouter.get('/receipts/:id', async (req, res) => {
   const { rows } = await pool.query('SELECT receipt_path, receipt_mime FROM reservations WHERE id = $1', [
     req.params.id,
   ]);
-  if (!rows[0]) return res.status(404).end();
+  if (!rows[0]?.receipt_path) return res.status(404).end();
   res.setHeader('Content-Type', rows[0].receipt_mime);
   res.setHeader('Cache-Control', 'private, max-age=3600');
   res.sendFile(absPath(rows[0].receipt_path));

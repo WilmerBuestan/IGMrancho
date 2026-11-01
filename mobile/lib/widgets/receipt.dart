@@ -7,14 +7,24 @@ import '../core/theme.dart';
 /// Miniatura del comprobante; al tocarla se abre en pantalla completa con zoom.
 class ReceiptThumb extends StatelessWidget {
   const ReceiptThumb({super.key, required this.url, required this.isPdf, this.size = 64, required this.heroTag});
-  final String url;
+  final String? url;
   final bool isPdf;
   final double size;
   final String heroTag;
 
   @override
   Widget build(BuildContext context) {
-    final full = api.url(url);
+    if (url == null) {
+      // Registrada por la administración sin comprobante (pago en efectivo)
+      return Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: context.subtle, borderRadius: BorderRadius.circular(14)),
+        child: Text('💵', style: TextStyle(fontSize: size * 0.4)),
+      );
+    }
+    final full = api.url(url!);
     return GestureDetector(
       onTap: () => isPdf ? launchUrl(Uri.parse(full), mode: LaunchMode.externalApplication) : openReceipt(context, full, heroTag),
       child: Hero(

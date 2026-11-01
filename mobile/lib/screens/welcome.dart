@@ -7,6 +7,7 @@ import '../core/format.dart';
 import '../core/models.dart';
 import '../core/theme.dart';
 import '../widgets/common.dart';
+import '../widgets/contact.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -97,6 +98,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProvider
                 action: 'Entrar como administrador',
                 onTap: () => context.go(api.isAdmin ? '/admin' : '/admin/login'),
               ).animate().fadeIn(delay: 780.ms).slideY(begin: 0.2, curve: Curves.easeOutCubic),
+              if (cfg != null) ...[
+                const SizedBox(height: 14),
+                ContactCard(contact: cfg!.contact, dark: true).animate().fadeIn(delay: 900.ms),
+              ],
               const SizedBox(height: 18),
               TextButton(
                 onPressed: () => context.go('/mis-reservas'),

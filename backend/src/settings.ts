@@ -14,6 +14,11 @@ export interface Account {
   cedula: string;
 }
 
+export interface Contact {
+  name: string;
+  phone: string; // celular ecuatoriano, ej. 0996038610
+}
+
 export interface Settings {
   prices: Prices;
   cutoff: string; // "HH:MM" hora local
@@ -25,6 +30,7 @@ export interface Settings {
   driveRootId: string | null; // carpeta raíz creada en Drive (se guarda para poder moverla/renombrarla)
   reminderMinutes: number; // minutos antes de la hora límite para el recordatorio push (0 = apagado)
   lastReminderFor: string | null; // fecha de servicio del último recordatorio enviado
+  contact: Contact; // a quién escribir si hay un problema con la reserva
 }
 
 const DEFAULTS: Settings = {
@@ -38,6 +44,7 @@ const DEFAULTS: Settings = {
   driveRootId: null,
   reminderMinutes: 60,
   lastReminderFor: null,
+  contact: { name: 'Erick Acosta', phone: '0996038610' },
 };
 
 export async function getSettings(): Promise<Settings> {
@@ -48,6 +55,7 @@ export async function getSettings(): Promise<Settings> {
     ...stored,
     prices: { ...DEFAULTS.prices, ...(stored.prices ?? {}) },
     account: { ...DEFAULTS.account, ...(stored.account ?? {}) },
+    contact: { ...DEFAULTS.contact, ...(stored.contact ?? {}) },
   };
 }
 

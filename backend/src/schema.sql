@@ -42,3 +42,21 @@ CREATE TABLE IF NOT EXISTS devices (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS devices_person_idx ON devices (cedula, email);
+
+-- Reservas creadas/editadas por el admin: el comprobante es opcional (pago en efectivo, etc.)
+ALTER TABLE reservations ALTER COLUMN receipt_path DROP NOT NULL;
+ALTER TABLE reservations ALTER COLUMN receipt_mime DROP NOT NULL;
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT 'cliente';
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+
+-- Historial de cambios hechos por el admin (también guarda las reservas eliminadas)
+CREATE TABLE IF NOT EXISTS reservation_history (
+  id             BIGSERIAL PRIMARY KEY,
+  reservation_id UUID NOT NULL,
+  code           TEXT NOT NULL,
+  -- creada | editada | estado | comprobante | eliminada
+  action         TEXT NOT NULL,
+  detail         JSONB NOT NULL DEFAULT '{}',
+  at             TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS reservation_history_res_idx ON reservation_history (reservation_id);

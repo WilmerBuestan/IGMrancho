@@ -14,6 +14,7 @@ import '../../widgets/common.dart';
 import '../../widgets/receipt.dart';
 import 'admin_shell.dart';
 import 'reports.dart' show shareCsv;
+import 'reservation_form.dart';
 
 class ReservationsScreen extends StatefulWidget {
   const ReservationsScreen({super.key, this.date, this.status});
@@ -84,7 +85,14 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
     final d = data;
     if (d == null) return const LoadingList();
     final list = d.reservations.where((r) => filter == null || r.status == filter).toList();
-    return RefreshIndicator(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openForm(null),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Nueva'),
+      ),
+      body: RefreshIndicator(
       onRefresh: _load,
       child: CustomScrollView(slivers: [
         SliverPadding(
@@ -169,7 +177,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
             child: Center(child: Text('Sin reservas', style: TextStyle(color: context.muted))),
           ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
           sliver: SliverList.separated(
             itemCount: list.length,
             separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -190,7 +198,8 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                             Expanded(child: Text(r.fullName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700))),
                             StatusBadge(r.status),
                           ]),
-                          Text('${r.cedula} · ${r.code}', style: TextStyle(fontSize: 12, color: context.muted)),
+                          Text('${r.cedula} · ${r.code}${r.createdBy == 'admin' ? ' · por admin' : ''}${r.updatedAt != null ? ' · editada' : ''}',
+                              style: TextStyle(fontSize: 12, color: context.muted)),
                           const SizedBox(height: 2),
                           Row(children: [
                             Expanded(child: Text(mealsText(r.qty), style: const TextStyle(fontSize: 13))),
@@ -206,17 +215,30 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
           ),
         ),
       ]),
+      ),
     );
   }
 
+  Future<void> _openForm(Reservation? r) async {
+    final saved = await Navigator.of(context).push<Reservation>(
+      MaterialPageRoute(builder: (_) => ReservationFormScreen(r: r, defaultDate: date ?? isoDay(DateTime.now().add(const Duration(days: 1))))),
+    );
+    if (saved == null || !mounted) return;
+    toast(context, r == null ? '✅ Reserva ${saved.code} creada' : '✓ Reserva actualizada');
+    if (saved.serviceDate != date) setState(() => date = saved.serviceDate);
+    _load();
+    refreshPending();
+  }
+
   Future<void> _review(Reservation r) async {
-    final changed = await showModalBottomSheet<bool>(
+    final changed = await showModalBottomSheet<Object>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true,
       builder: (_) => ReviewSheet(r: r),
     );
+    if (changed == 'edit') return _openForm(r);
     if (changed == true) {
       _load();
       refreshPending();
@@ -234,6 +256,64 @@ class ReviewSheet extends StatefulWidget {
 class _ReviewSheetState extends State<ReviewSheet> {
   late final note = TextEditingController(text: widget.r.adminNote ?? '');
   bool saving = false;
+  List<HistoryItem> history = [];
+
+  @override
+  void initState() {
+    super.initState();
+    api.history(widget.r.id).then((h) => mounted ? setState(() => history = h) : null).catchError((_) {});
+  }
+
+  Future<void> _delete() async {
+    final reason = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        icon: const Icon(Icons.delete_outline_rounded, color: Brand.danger, size: 40),
+        title: Text('¿Eliminar ${widget.r.code}?'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Se quitará de las listas y reportes. Queda registrada en el historial.'),
+          const SizedBox(height: 12),
+          TextField(controller: reason, decoration: const InputDecoration(labelText: 'Motivo (opcional)', hintText: 'Ej. Reserva duplicada')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancelar')),
+          FilledButton(style: FilledButton.styleFrom(backgroundColor: Brand.danger), onPressed: () => Navigator.pop(c, true), child: const Text('Eliminar')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => saving = true);
+    try {
+      await api.deleteReservation(widget.r.id, reason.text.trim());
+      HapticFeedback.mediumImpact();
+      if (mounted) {
+        toast(context, '🗑️ Reserva eliminada');
+        Navigator.pop(context, true);
+      }
+    } on ApiException catch (e) {
+      if (mounted) toast(context, e.message, error: true);
+      setState(() => saving = false);
+    }
+  }
+
+  String _describe(HistoryItem h) {
+    final d = h.detail;
+    switch (h.action) {
+      case 'estado':
+        return '${d['de']} → ${d['a']}${d['nota'] != null ? ' · "${d['nota']}"' : ''}';
+      case 'creada':
+        return 'por ${d['por'] ?? 'cliente'}';
+      case 'editada':
+        return d.entries.map((e) {
+          if (e.key == 'comprobante') return 'comprobante reemplazado';
+          final c = e.value as Map;
+          String f(dynamic x) => e.key == 'total' ? money((x as num).toInt()) : '${x ?? '—'}';
+          return '${e.key}: ${f(c['de'])} → ${f(c['a'])}';
+        }).join(' · ');
+    }
+    return '';
+  }
 
   Future<void> _save(Status s) async {
     setState(() => saving = true);
@@ -253,7 +333,7 @@ class _ReviewSheetState extends State<ReviewSheet> {
   @override
   Widget build(BuildContext context) {
     final r = widget.r;
-    final img = api.url(r.receiptUrl);
+    final img = r.hasReceipt ? api.url(r.receiptUrl!) : '';
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.92,
@@ -262,7 +342,14 @@ class _ReviewSheetState extends State<ReviewSheet> {
         controller: ctrl,
         padding: EdgeInsets.fromLTRB(16, 0, 16, 24 + MediaQuery.of(context).viewInsets.bottom),
         children: [
-          GestureDetector(
+          if (!r.hasReceipt)
+            Container(
+              height: 160,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: context.subtle, borderRadius: BorderRadius.circular(18)),
+              child: const Text('💵\nSin comprobante · registrada por la administración', textAlign: TextAlign.center),
+            )
+          else GestureDetector(
             onTap: () => r.isPdf ? launchUrl(Uri.parse(img), mode: LaunchMode.externalApplication) : openReceipt(context, img, 'sheet-${r.id}'),
             child: Hero(
               tag: 'sheet-${r.id}',
@@ -337,6 +424,42 @@ class _ReviewSheetState extends State<ReviewSheet> {
           ]),
           if (r.status != Status.pendiente)
             TextButton(onPressed: saving ? null : () => _save(Status.pendiente), child: const Text('Volver a "por verificar"')),
+          const Divider(height: 24),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : () => Navigator.pop(context, 'edit'),
+                icon: const Icon(Icons.edit_rounded),
+                label: const Text('Editar datos'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(foregroundColor: Brand.danger),
+                onPressed: saving ? null : _delete,
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Eliminar'),
+              ),
+            ),
+          ]),
+          if (history.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: Text('Historial de cambios (${history.length})', style: const TextStyle(fontWeight: FontWeight.w700)),
+              children: [
+                for (final h in history)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Text(const {'creada': '🆕', 'editada': '✏️', 'estado': '🔄', 'eliminada': '🗑️'}[h.action] ?? '•', style: const TextStyle(fontSize: 18)),
+                    title: Text(_describe(h)),
+                    subtitle: Text('${h.at.day}/${h.at.month} ${h.at.hour.toString().padLeft(2, '0')}:${h.at.minute.toString().padLeft(2, '0')}'),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );

@@ -6,6 +6,8 @@ export const MEALS: { key: Meal; label: string; emoji: string; hint: string; col
   { key: 'merienda', label: 'Merienda', emoji: '🍲', hint: 'Noche', color: '#1baf7a' },
 ];
 
+export interface Contact { name: string; phone: string }
+
 export interface Account { titular: string; banco: string; tipo: string; numero: string; cedula: string }
 
 export interface PublicConfig {
@@ -19,6 +21,7 @@ export interface PublicConfig {
   deadline: string;
   emailDomain: string;
   closedDates: string[];
+  contact: Contact;
 }
 
 export interface AdminSettings {
@@ -33,6 +36,7 @@ export interface AdminSettings {
   driveFolderUrl?: string | null;
   reminderMinutes: number;
   pushEnabled?: boolean;
+  contact: Contact;
 }
 
 export type Status = 'pendiente' | 'aprobada' | 'rechazada';
@@ -50,8 +54,10 @@ export interface Reservation {
   totalCents: number;
   status: Status;
   adminNote: string | null;
-  receiptMime: string;
-  receiptUrl: string;
+  receiptMime: string | null;
+  receiptUrl: string | null;
+  createdBy?: 'cliente' | 'admin';
+  updatedAt?: string | null;
   driveStatus?: 'pending' | 'uploaded' | 'failed' | 'disabled';
   driveLink?: string | null;
   createdAt: string;
@@ -131,4 +137,15 @@ export function isValidCedula(c: string): boolean {
     sum += d;
   }
   return (10 - (sum % 10)) % 10 === Number(c[9]);
+}
+
+/** 0996038610 → 593996038610 (formato internacional para WhatsApp) */
+export function waNumber(phone: string): string {
+  const d = phone.replace(/\D/g, '');
+  return d.startsWith('593') ? d : d.startsWith('0') ? `593${d.slice(1)}` : d;
+}
+
+export function prettyPhone(phone: string): string {
+  const d = phone.replace(/\D/g, '');
+  return d.length === 10 ? `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}` : phone;
 }

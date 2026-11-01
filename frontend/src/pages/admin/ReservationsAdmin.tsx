@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api, downloadCsv, longDate, mealsText, money, Reservation, Status } from '../../api';
 import PageTitle from '../../components/PageTitle';
+import Thumb from '../../components/Thumb';
+import ReservationForm from './ReservationForm';
 import Receipt from '../../components/Receipt';
 import StatusBadge from '../../components/StatusBadge';
 
@@ -37,6 +39,8 @@ export default function ReservationsAdmin() {
   const [q, setQ] = useState('');
   const [data, setData] = useState<ListResponse | null>(null);
   const [selected, setSelected] = useState<Reservation | null>(null);
+  // null = cerrado · 'nueva' = crear · Reservation = editar
+  const [form, setForm] = useState<Reservation | 'nueva' | null>(null);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -69,6 +73,7 @@ export default function ReservationsAdmin() {
     <div className="space-y-5">
       <PageTitle title="Registrados del día" subtitle={data ? longDate(data.date) : ''}
                  actions={<>
+                   <button className="btn-gold py-2.5" onClick={() => setForm('nueva')}>＋ Nueva reserva</button>
                    <div className="flex items-center gap-1">
                      <button className="btn-ghost px-3 py-2.5" title="Día anterior" onClick={() => shift(-1)} disabled={!shown}>‹</button>
                      <input type="date" className="input py-2.5" value={shown} onChange={(e) => setDate(e.target.value)} />
@@ -117,10 +122,8 @@ export default function ReservationsAdmin() {
           <tbody className="divide-y divide-igm-100">
             {list.map((r) => (
               <tr key={r.id} className="cursor-pointer hover:bg-igm-50/60" onClick={() => setSelected(r)}>
-                <td className="px-4 py-2"><div className="h-12 w-12 overflow-hidden rounded-lg bg-igm-100">
-                  {r.receiptMime === 'application/pdf' ? <div className="grid h-full place-items-center text-xs">PDF</div> : <img src={r.receiptUrl} loading="lazy" className="h-full w-full object-cover" alt="" />}
-                </div></td>
-                <td className="px-4 py-2"><div className="font-semibold">{r.fullName}</div><div className="text-xs text-igm-500">{r.cedula} · {r.code}</div></td>
+                <td className="px-4 py-2"><Thumb r={r} /></td>
+                <td className="px-4 py-2"><div className="font-semibold">{r.fullName}</div><div className="text-xs text-igm-500">{r.cedula} · {r.code}{r.createdBy === 'admin' && ' · por admin'}{r.updatedAt && ' · editada'}</div></td>
                 <td className="px-4 py-2 text-igm-700">{mealsText(r)}</td>
                 <td className="px-4 py-2 text-right font-bold tabular-nums">{money(r.totalCents)}</td>
                 <td className="px-4 py-2"><StatusBadge status={r.status} /></td>
@@ -138,9 +141,7 @@ export default function ReservationsAdmin() {
       <div className="space-y-3 md:hidden">
         {list.map((r) => (
           <button key={r.id} onClick={() => setSelected(r)} className="card flex w-full gap-3 p-3 text-left">
-            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-igm-100">
-              {r.receiptMime === 'application/pdf' ? <div className="grid h-full place-items-center text-xs">PDF</div> : <img src={r.receiptUrl} loading="lazy" className="h-full w-full object-cover" alt="" />}
-            </div>
+            <Thumb r={r} className="h-16 w-16 rounded-xl" />
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2"><span className="truncate font-semibold">{r.fullName}</span><StatusBadge status={r.status} /></div>
               <div className="text-xs text-igm-500">{r.cedula}</div>
@@ -151,7 +152,10 @@ export default function ReservationsAdmin() {
         {list.length === 0 && <p className="card p-8 text-center text-igm-400">Sin reservas.</p>}
       </div>
 
-      {selected && <ReviewModal r={selected} onClose={() => setSelected(null)} onSaved={() => { setSelected(null); load(); }} />}
+      {selected && <ReviewModal r={selected} onClose={() => setSelected(null)} onSaved={() => { setSelected(null); load(); }}
+                                onEdit={() => { setForm(selected); setSelected(null); }} />}
+      {form && <ReservationForm r={form === 'nueva' ? null : form} defaultDate={shown} onClose={() => setForm(null)}
+                                onSaved={(r) => { setForm(null); if (r.serviceDate !== shown) setDate(r.serviceDate); else load(); }} />}
     </div>
   );
 }
@@ -165,9 +169,47 @@ function Stat({ label, value, emoji, highlight, className = '' }: { label: strin
   );
 }
 
-function ReviewModal({ r, onClose, onSaved }: { r: Reservation; onClose: () => void; onSaved: () => void }) {
+interface HistoryItem { action: string; detail: Record<string, unknown>; at: string }
+
+const ACTION_LABEL: Record<string, string> = {
+  creada: '🆕 Creada', editada: '✏️ Editada', estado: '🔄 Estado', eliminada: '🗑️ Eliminada',
+};
+
+function describe(h: HistoryItem): string {
+  const d = h.detail as Record<string, { de: unknown; a: unknown } | unknown>;
+  if (h.action === 'estado') return `${d.de} → ${d.a}${d.nota ? ` · “${d.nota}”` : ''}`;
+  if (h.action === 'creada') return `por ${d.por ?? 'cliente'}`;
+  if (h.action === 'editada') {
+    return Object.entries(d).map(([k, v]) => {
+      const c = v as { de: unknown; a: unknown };
+      const f = (x: unknown) => (k === 'total' ? money(Number(x)) : String(x ?? '—'));
+      return k === 'comprobante' ? 'comprobante reemplazado' : `${k}: ${f(c.de)} → ${f(c.a)}`;
+    }).join(' · ');
+  }
+  return '';
+}
+
+function ReviewModal({ r, onClose, onSaved, onEdit }: { r: Reservation; onClose: () => void; onSaved: () => void; onEdit: () => void }) {
   const [note, setNote] = useState(r.adminNote ?? '');
   const [saving, setSaving] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [reason, setReason] = useState('');
+
+  useEffect(() => {
+    api<HistoryItem[]>(`/admin/reservations/${r.id}/history`, {}, true).then(setHistory).catch(() => {});
+  }, [r.id]);
+
+  async function remove() {
+    setSaving(true);
+    try {
+      await api(`/admin/reservations/${r.id}`, { method: 'DELETE', body: JSON.stringify({ reason }) }, true);
+      onSaved();
+    } catch (e) {
+      alert((e as Error).message);
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -191,11 +233,15 @@ function ReviewModal({ r, onClose, onSaved }: { r: Reservation; onClose: () => v
       <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-t-3xl bg-white sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="grid md:grid-cols-[1.1fr_1fr]">
           <div className="bg-igm-950 md:rounded-l-3xl">
-            {r.receiptMime === 'application/pdf' ? (
-              <iframe src={r.receiptUrl} title="Comprobante" className="h-[60vh] w-full" />
+            {!r.receiptUrl ? (
+              <div className="grid h-64 place-items-center p-6 text-center text-igm-200 md:h-full">
+                <div><div className="text-5xl">💵</div><p className="mt-2">Sin comprobante<br /><span className="text-sm text-igm-400">Registrada por la administración</span></p></div>
+              </div>
+            ) : r.receiptMime === 'application/pdf' ? (
+              <iframe src={r.receiptUrl ?? undefined} title="Comprobante" className="h-[60vh] w-full" />
             ) : (
-              <a href={r.receiptUrl} target="_blank" rel="noreferrer">
-                <img src={r.receiptUrl} alt="Comprobante" className="mx-auto max-h-[60vh] w-full object-contain md:max-h-[85vh]" />
+              <a href={r.receiptUrl ?? undefined} target="_blank" rel="noreferrer">
+                <img src={r.receiptUrl ?? undefined} alt="Comprobante" className="mx-auto max-h-[60vh] w-full object-contain md:max-h-[85vh]" />
               </a>
             )}
           </div>
@@ -226,6 +272,33 @@ function ReviewModal({ r, onClose, onSaved }: { r: Reservation; onClose: () => v
             </div>
             {r.status !== 'pendiente' && (
               <button className="w-full text-sm text-igm-500 underline" disabled={saving} onClick={() => save('pendiente')}>Volver a “por verificar”</button>
+            )}
+            <div className="grid grid-cols-2 gap-3 border-t border-igm-100 pt-4">
+              <button className="btn-ghost" disabled={saving} onClick={onEdit}>✏️ Editar datos</button>
+              <button className="btn bg-white text-red-700 ring-1 ring-red-200 hover:bg-red-50" disabled={saving} onClick={() => setConfirmDelete(true)}>🗑️ Eliminar</button>
+            </div>
+            {confirmDelete && (
+              <div className="space-y-3 rounded-2xl bg-red-50 p-4 ring-1 ring-red-200">
+                <p className="text-sm font-semibold text-red-800">¿Eliminar la reserva {r.code}? Se quitará de las listas y reportes; queda en el historial.</p>
+                <input className="input" placeholder="Motivo para la persona (opcional), ej. Reserva duplicada" value={reason} onChange={(e) => setReason(e.target.value)} />
+                <div className="grid grid-cols-2 gap-2">
+                  <button className="btn-ghost py-2" onClick={() => setConfirmDelete(false)}>Cancelar</button>
+                  <button className="btn bg-red-600 py-2 text-white hover:bg-red-700" disabled={saving} onClick={remove}>Sí, eliminar</button>
+                </div>
+              </div>
+            )}
+            {history.length > 0 && (
+              <details className="rounded-2xl bg-igm-50 p-3 text-sm">
+                <summary className="cursor-pointer font-semibold text-igm-700">Historial de cambios ({history.length})</summary>
+                <ul className="mt-2 space-y-2">
+                  {history.map((h, i) => (
+                    <li key={i} className="border-l-2 border-igm-200 pl-3">
+                      <div className="font-semibold">{ACTION_LABEL[h.action] ?? h.action} <span className="font-normal text-igm-500">· {new Date(h.at).toLocaleString('es-EC')}</span></div>
+                      <div className="text-igm-600">{describe(h)}</div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
           </div>
         </div>

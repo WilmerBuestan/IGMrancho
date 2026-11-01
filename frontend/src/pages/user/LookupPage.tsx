@@ -1,5 +1,6 @@
+import Contacto from '../../components/Contacto';
 import { FormEvent, useEffect, useState } from 'react';
-import { api, longDate, mealsText, money, Reservation } from '../../api';
+import { api, Contact, longDate, mealsText, money, PublicConfig, Reservation } from '../../api';
 import Receipt from '../../components/Receipt';
 import StatusBadge from '../../components/StatusBadge';
 
@@ -24,6 +25,9 @@ export default function LookupPage() {
     }
   }
 
+  const [contact, setContact] = useState<Contact | null>(null);
+  useEffect(() => { api<PublicConfig>('/config').then((c) => setContact(c.contact)).catch(() => {}); }, []);
+
   useEffect(() => {
     if (cedula && email) search();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -32,6 +36,7 @@ export default function LookupPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-3xl font-extrabold tracking-tight">Mis reservas</h1>
+      <Contacto contact={contact} title="¿Algo está mal en tu reserva?" />
       <form onSubmit={search} className="card grid gap-3 p-5 sm:grid-cols-[1fr_1.4fr_auto] sm:items-end">
         <div>
           <label className="label" htmlFor="lk-ced">Cédula</label>
@@ -49,7 +54,9 @@ export default function LookupPage() {
       <div className="space-y-3">
         {list?.map((r) => (
           <article key={r.id} className="card flex gap-4 p-4">
-            <Receipt url={r.receiptUrl} mime={r.receiptMime} className="h-20 w-20 shrink-0" />
+            {r.receiptUrl
+              ? <Receipt url={r.receiptUrl} mime={r.receiptMime ?? ''} className="h-20 w-20 shrink-0" />
+              : <div className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-igm-100 text-2xl" title="Registrada por la administración">💵</div>}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-bold">{longDate(r.serviceDate)}</span>

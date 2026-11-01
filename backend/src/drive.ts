@@ -114,7 +114,7 @@ export async function syncDrive(): Promise<void> {
       `SELECT id, code, to_char(service_date, 'YYYY-MM-DD') AS service_date, full_name, cedula,
               receipt_path, receipt_mime
          FROM reservations
-        WHERE drive_status IN ('pending', 'failed', 'disabled') AND drive_attempts < $1
+        WHERE receipt_path IS NOT NULL AND drive_status IN ('pending', 'failed', 'disabled') AND drive_attempts < $1
         ORDER BY created_at LIMIT 20`,
       [MAX_ATTEMPTS],
     );
@@ -138,4 +138,14 @@ export function startDriveLoop(): void {
   const tick = () => syncDrive().catch((e) => console.error('[drive]', e));
   tick();
   setInterval(tick, 60_000);
+}
+
+/** Manda a la papelera de Drive un comprobante (se puede recuperar 30 días desde Drive). */
+export async function trashDriveFile(fileId: string | null): Promise<void> {
+  if (!driveEnabled || !fileId) return;
+  try {
+    await drive().files.update({ fileId, requestBody: { trashed: true } });
+  } catch (err) {
+    console.error('[drive] no se pudo enviar a la papelera:', (err as Error).message);
+  }
 }

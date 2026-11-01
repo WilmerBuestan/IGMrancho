@@ -10,6 +10,7 @@ import '../../core/push.dart';
 import '../../core/theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/receipt.dart';
+import '../../widgets/contact.dart';
 
 class LookupScreen extends StatefulWidget {
   const LookupScreen({super.key});
@@ -21,12 +22,14 @@ class _LookupScreenState extends State<LookupScreen> {
   final cedula = TextEditingController(text: profile.cedula);
   final email = TextEditingController(text: profile.email);
   List<Reservation>? list;
+  Contact? contact;
   String? error;
   bool loading = false;
 
   @override
   void initState() {
     super.initState();
+    api.config().then((c) => mounted ? setState(() => contact = c.contact) : null).catchError((_) {});
     if (profile.complete) _search();
   }
 
@@ -55,6 +58,8 @@ class _LookupScreenState extends State<LookupScreen> {
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         children: [
           const Text('Mis reservas', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 14),
+          ContactCard(contact: contact, title: '¿Algo está mal en tu reserva?'),
           const SizedBox(height: 14),
           if (!profile.complete || list == null)
             Card(
