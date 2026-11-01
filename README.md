@@ -24,14 +24,16 @@ y sube la captura. La administración verifica el pago desde `/admin`.
 - Nombre, cédula (validada) y correo `@geograficomilitar.gob.ec`; subir captura (imagen o PDF).
 - Se reserva para el **siguiente día con servicio** hasta la hora límite de la víspera.
 - **Mis reservas**: con cédula + correo se ve el estado (por verificar / aprobada / rechazada) y la captura.
+- **Contacto**: si algo sale mal, botones de WhatsApp y llamada a Erick Acosta (0996038610, editable).
 
 **Modo administrador** (`/admin`, menú lateral en computadora y desplegable en celular):
 - **Dashboard**: cuánto preparar mañana, pagos por verificar, recaudado, ranchos y personas de 14 días, gráfico de ranchos por día, quiénes más reservan y a qué hora reservan.
 - **Registrados del día**: lista con captura, aprobar/rechazar con nota, búsqueda, filtros, navegar entre días, imprimir lista para cocina y exportar a Excel.
+- **CRUD de reservas**: crear a mano (pago en efectivo, comprobante opcional), editar cualquier dato (cantidades, fecha, total, estado, comprobante), eliminar con motivo e historial de cambios. La persona recibe un aviso en la app.
 - **Reportes**: por rango (mañana, hoy, semana, mes, mes pasado, 30 días o personalizado), totales, gráfico, tablas por día y por persona, Excel e impresión.
 - **Precios y menú**: precio de cada tipo y aviso/menú del día.
 - **Fechas y horarios**: abrir/cerrar reservas, hora límite y días sin servicio (feriados).
-- **Cuenta, QR y Drive**: datos de la cuenta, imagen del QR y estado de Google Drive.
+- **Cuenta, QR y Drive**: datos de la cuenta, imagen del QR, contacto para problemas (WhatsApp/llamada) y estado de Google Drive.
 
 El usuario y la contraseña del admin se configuran en `.env` (`ADMIN_USER`, `ADMIN_PASSWORD`).
 
