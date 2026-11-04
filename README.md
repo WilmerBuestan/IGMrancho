@@ -1,5 +1,8 @@
 # IGM Rancho
 
+> 🗄️ **Proyecto archivado (2026-11-04).** Funcionaba completo, pero no se puso en uso. Está fuera de línea y se
+> conserva como referencia. Ver [LECCIONES.md](LECCIONES.md).
+
 Reserva de desayuno, almuerzo y merienda para el personal del IGM. La persona elige
 cuántos ranchos quiere para mañana, transfiere con el QR de la cuenta de Erick Acosta
 y sube la captura. La administración verifica el pago desde `/admin`.
